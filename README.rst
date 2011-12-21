@@ -19,7 +19,8 @@ clone the repository with git:
 ::
 
     $ git clone https://github.com/jone/plone-trakt-syncer.git
-    $ sync --help
+    $ cd plex-trakt-syncer
+    $ plex-trakt-sync.py --help
 
 You may also want to set up a cronjob for starting the script.
 
