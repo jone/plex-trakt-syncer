@@ -1,9 +1,14 @@
 #!/usr/bin/env python
 
-import logging
 from optparse import OptionParser
+from xml.dom.minidom import parseString
+import hashlib
+import json
+import logging
 import os
 import sys
+import urllib
+import urllib2
 
 
 VERSION = '1.0'
@@ -32,6 +37,7 @@ logging.basicConfig(
 
 LOG = logging.getLogger('plex-trakt-syncer')
 LOG.addHandler(logging.StreamHandler())
+LOG.setLevel(logging.DEBUG)
 
 
 class Syncer(object):
@@ -41,6 +47,12 @@ class Syncer(object):
             args = sys.argv[1:]
 
         self.parse_arguments(args)
+
+        movies = []
+        for node in tuple(self.plex_get_watched_movies())[:20]:
+            movies.append(self.get_movie_data(node))
+
+        print self.trakt_report_movies(movies)
 
     def quit_with_error(self, message):
         LOG.error(message)
@@ -67,6 +79,11 @@ class Syncer(object):
             '-u', '--username', dest='trakt_username',
             metavar='USERNAME',
             help='trakt.tv username')
+
+        parser.add_option(
+            '-p', '--password', dest='trakt_password',
+            metavar='PASSWORD',
+            help='trakt.tv password')
 
         parser.add_option(
             '-k', '--key', dest='trakt_key',
@@ -98,12 +115,78 @@ class Syncer(object):
         if not self.options.trakt_key:
             self.quit_with_error('Please define a trakt API key (-k).')
 
+        if not self.options.trakt_password:
+            self.quit_with_error('Please define a trakt password (-p).')
+
         if self.options.max_hate > 10 or self.options.max_hate < 0:
             self.quit_with_error('--max-hate should be between 1 and 10')
 
         if self.options.min_love > 10 or self.options.min_love < 0:
             self.quit_with_error('--min-love should be between 1 and 10')
 
+    def plex_get_watched_movies(self):
+        for node in self._plex_request('library/sections/1/all'):
+            if node.getAttribute('viewCount'):
+                yield node
+
+    def get_movie_data(self, node):
+        """Returns movie data from a XML node, prepared to post to trakt.
+        """
+        return {'title': node.getAttribute('title'),
+                'year': node.getAttribute('year'),
+                'plays': node.getAttribute('viewCount'),
+                'last_played': node.getAttribute('updatedAt')}
+
+    def trakt_report_movies(self, movies):
+        print self._trakt_post('movie/seen', {'movies': movies})
+
+    def _plex_request(self, path):
+        """Makes a request to plex and parses the XML with minidom.
+        """
+        url = 'http://%s:%i/%s' % (
+            self.options.plex_host,
+            self.options.plex_port,
+            path)
+
+        response = urllib.urlopen(url)
+        data = response.read()
+        doc = parseString(data)
+
+        return doc.getElementsByTagName('Video')
+
+    def _trakt_post(self, path, data):
+        """Posts informations to trakt. Data should be a dict which will
+        be updated with user credentials.
+        """
+        url = 'http://api.trakt.tv/%s/%s' % (path, self.options.trakt_key)
+        passwd = hashlib.sha1(self.options.trakt_password).hexdigest()
+
+        postdata = {'username': self.options.trakt_username,
+                    'password': passwd}
+        postdata.update(data)
+
+        LOG.info('trakt POST to %s' % path)
+        try:
+            request = urllib2.Request(url, urllib.urlencode(postdata))
+            response = urllib2.urlopen(request)
+
+        except urllib2.URLError, e:
+            LOG.error(e)
+            raise
+
+        resp_data = response.read()
+        resp_json = json.loads(resp_data)
+        if resp_json.get('status') == 'success':
+            LOG.info('trakt response: %s' % resp_data)
+            return True
+
+        else:
+            self.quit_with_error('trakt request failed with %s' % resp_data)
+
 
 if __name__ == '__main__':
-    Syncer()()
+    try:
+        Syncer()()
+    except Exception, e:
+        LOG.error(str(e))
+        raise
