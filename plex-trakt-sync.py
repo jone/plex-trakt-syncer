@@ -17,7 +17,7 @@ EPILOG = '''
 ** Rating **           The plex rating allows to give up to 5 stars for
 a movie, but you can also give half stars, so there are 10 steps for the
 rating. The configurable --min-hate and --max-love options take a value
-between 0 and 10. Movies which are not yet rated in plex are not flagged
+between 1 and 10. Movies which are not yet rated in plex are not flagged
 at all.
 '''
 
@@ -59,6 +59,11 @@ class Syncer(object):
             help='Hostname or IP of plex server (default: localhost)')
 
         parser.add_option(
+            '-P', '--port', dest='plex_port', default=32400,
+            metavar='PORT',
+            help='Port of the plex server (default: 32400)')
+
+        parser.add_option(
             '-u', '--username', dest='trakt_username',
             metavar='USERNAME',
             help='trakt.tv username')
@@ -90,7 +95,14 @@ class Syncer(object):
         if not self.options.trakt_username:
             self.quit_with_error('Please define a trakt username (-u).')
 
-        print self.options, self.arguments
+        if not self.options.trakt_key:
+            self.quit_with_error('Please define a trakt API key (-k).')
+
+        if self.options.max_hate > 10 or self.options.max_hate < 0:
+            self.quit_with_error('--max-hate should be between 1 and 10')
+
+        if self.options.min_love > 10 or self.options.min_love < 0:
+            self.quit_with_error('--min-love should be between 1 and 10')
 
 
 if __name__ == '__main__':
