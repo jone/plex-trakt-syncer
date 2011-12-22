@@ -40,6 +40,9 @@ LOG = logging.getLogger('plex-trakt-syncer')
 LOG.addHandler(logging.StreamHandler())
 LOG.setLevel(logging.INFO)
 
+RATE_LOVE = 'love'
+RATE_HATE = 'hate'
+
 
 class Syncer(object):
 
@@ -49,14 +52,11 @@ class Syncer(object):
 
         self.parse_arguments(args)
 
-        movies = []
-        for node in tuple(self.plex_get_watched_movies())[:40]:
-            movie = self.get_movie_data(node)
-            LOG.debug('mark "%s (%s)" as seen' % (
-                    movie['title'], movie['year']))
-            movies.append(movie)
+        movie_nodes = tuple(self.plex_get_watched_movies())
+        self.trakt_report_movies(movie_nodes)
 
-        print self.trakt_report_movies(movies)
+        if self.options.rate:
+            self.trakt_rate_movies(movie_nodes)
 
     def quit_with_error(self, message):
         LOG.error(message)
@@ -148,9 +148,53 @@ class Syncer(object):
                 'plays': node.getAttribute('viewCount'),
                 'last_played': node.getAttribute('updatedAt')}
 
-    def trakt_report_movies(self, movies):
-        LOG.info('Mark %s movies as seen at trakt.tv' % len(movies))
+    def get_movie_rating(self, node):
+        rating = node.getAttribute('userRating')
+        if not rating:
+            return None
+
+        rating = int(rating)
+        if rating >= self.options.min_love:
+            return RATE_LOVE
+
+        elif rating <= self.options.max_hate:
+            return RATE_HATE
+
+        return None
+
+    def trakt_report_movies(self, nodes):
+        movies = []
+
+        for node in nodes:
+            movie = self.get_movie_data(node)
+            LOG.debug('Mark "%s (%s)" as seen' % (
+                    movie['title'], movie['year']))
+            movies.append(movie)
+
+        LOG.info('Mark %s movies as seen in trakt.tv' % len(movies))
         self._trakt_post('movie/seen', {'movies': movies})
+
+    def trakt_rate_movies(self, nodes):
+        rated = 0
+        total = 0
+
+        for node in nodes:
+            total += 1
+
+            movie = self.get_movie_data(node)
+            rating = self.get_movie_rating(node)
+            if not rating:
+                continue
+
+            movie.update({'rating': rating})
+            LOG.info('Rate "%s (%s)" with "%s"' % (
+                    movie['title'], movie['year'], rating))
+            self._trakt_post('rate/movie', movie)
+
+            rated += 1
+
+        LOG.info('Rated %s of %s movies in trakt.tv' % (
+                rated, total))
 
     def _plex_request(self, path):
         """Makes a request to plex and parses the XML with minidom.

@@ -45,6 +45,8 @@ Usage
       -P PORT, --port=PORT  Port of the plex server (default: 32400)
       -u USERNAME, --username=USERNAME
                             trakt.tv username
+      -p PASSWORD, --password=PASSWORD
+                            trakt.tv password
       -k API-KEY, --key=API-KEY
                             trakt.tv API key
       -r, --rate            Submit plex movie ratings to trakt.
@@ -52,12 +54,12 @@ Usage
                             (In combination with -r option, defaults to 3).
       --min-love=1-10       Minimum plex rating for flagging a movie with "love"
                             (In combination with -r option, defaults to 8).
+      -v, --verbose         Print more verbose debugging informations.
     
      ** Rating **           The plex rating allows to give up to 5 stars for a
-    movie, but you can also give half stars, so there are 10 steps for the
-    rating. The configurable --min-hate and --max-love options take a value
-    between 1 and 10. Movies which are not yet rated in plex are not flagged at
-    all.
+    movie, but you can also give half stars, so there are 10 steps for the rating.
+    The configurable --min-hate and --max-love options take a value between 1 and
+    10. Movies which are not yet rated in plex are not flagged at all.
 
 .. %usage-end%
 
