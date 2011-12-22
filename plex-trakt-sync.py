@@ -52,7 +52,7 @@ class Syncer(object):
         movies = []
         for node in tuple(self.plex_get_watched_movies())[:40]:
             movie = self.get_movie_data(node)
-            LOG.info('mark "%s (%s)" as seen' % (
+            LOG.debug('mark "%s (%s)" as seen' % (
                     movie['title'], movie['year']))
             movies.append(movie)
 
@@ -110,9 +110,16 @@ class Syncer(object):
             help='Minimum plex rating for flagging a movie with "love" '
             '(In combination with -r option, defaults to 8).')
 
-        # validate options
+        parser.add_option(
+            '-v', '--verbose', dest='verbose', action='store_true',
+            help='Print more verbose debugging informations.')
+
         self.options, self.arguments = parser.parse_args(args)
 
+        if self.options.verbose:
+            LOG.setLevel(logging.DEBUG)
+
+        # validate options
         if not self.options.trakt_username:
             self.quit_with_error('Please define a trakt username (-u).')
 
@@ -142,7 +149,8 @@ class Syncer(object):
                 'last_played': node.getAttribute('updatedAt')}
 
     def trakt_report_movies(self, movies):
-        print self._trakt_post('movie/seen', {'movies': movies})
+        LOG.info('Mark %s movies as seen at trakt.tv' % len(movies))
+        self._trakt_post('movie/seen', {'movies': movies})
 
     def _plex_request(self, path):
         """Makes a request to plex and parses the XML with minidom.
@@ -152,9 +160,13 @@ class Syncer(object):
             self.options.plex_port,
             path)
 
+        LOG.info('Plex request to %s' % url)
+
         response = urllib.urlopen(url)
         data = response.read()
         doc = parseString(data)
+
+        LOG.info('Plex request success')
 
         return doc.getElementsByTagName('Video')
 
@@ -169,7 +181,8 @@ class Syncer(object):
                     'password': passwd}
         postdata.update(data)
 
-        LOG.info('trakt POST to %s' % path)
+        LOG.debug('POST to %s ...' % url)
+        LOG.debug(pformat(data))
         try:
             # data = urllib.urlencode(postdata)
             request = urllib2.Request(url, json.dumps(postdata))
@@ -184,17 +197,17 @@ class Syncer(object):
         if resp_json.get('status') == 'success':
 
             if LOG.isEnabledFor(logging.DEBUG):
-                LOG.debug('detailed trakt response: %s' % pformat(resp_json))
+                LOG.debug('Trakt request success: %s' % pformat(resp_json))
 
             else:
                 filtered_data = dict([(key, value) for (key, value) in resp_json.items()
                                   if not key.endswith('_movies')])
-                LOG.info('trakt response (filtered): %s' % pformat(filtered_data))
+                LOG.info('Trakt request success: %s' % pformat(filtered_data))
 
             return True
 
         else:
-            self.quit_with_error('trakt request failed with %s' % resp_data)
+            self.quit_with_error('Trakt request failed with %s' % resp_data)
 
 
 if __name__ == '__main__':
