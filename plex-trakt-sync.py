@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from optparse import OptionParser
+from pprint import pformat
 from xml.dom.minidom import parseString
 import hashlib
 import json
@@ -37,7 +38,7 @@ logging.basicConfig(
 
 LOG = logging.getLogger('plex-trakt-syncer')
 LOG.addHandler(logging.StreamHandler())
-LOG.setLevel(logging.DEBUG)
+LOG.setLevel(logging.INFO)
 
 
 class Syncer(object):
@@ -49,8 +50,11 @@ class Syncer(object):
         self.parse_arguments(args)
 
         movies = []
-        for node in tuple(self.plex_get_watched_movies())[:20]:
-            movies.append(self.get_movie_data(node))
+        for node in tuple(self.plex_get_watched_movies())[:40]:
+            movie = self.get_movie_data(node)
+            LOG.info('mark "%s (%s)" as seen' % (
+                    movie['title'], movie['year']))
+            movies.append(movie)
 
         print self.trakt_report_movies(movies)
 
@@ -167,7 +171,8 @@ class Syncer(object):
 
         LOG.info('trakt POST to %s' % path)
         try:
-            request = urllib2.Request(url, urllib.urlencode(postdata))
+            # data = urllib.urlencode(postdata)
+            request = urllib2.Request(url, json.dumps(postdata))
             response = urllib2.urlopen(request)
 
         except urllib2.URLError, e:
@@ -177,7 +182,15 @@ class Syncer(object):
         resp_data = response.read()
         resp_json = json.loads(resp_data)
         if resp_json.get('status') == 'success':
-            LOG.info('trakt response: %s' % resp_data)
+
+            if LOG.isEnabledFor(logging.DEBUG):
+                LOG.debug('detailed trakt response: %s' % pformat(resp_json))
+
+            else:
+                filtered_data = dict([(key, value) for (key, value) in resp_json.items()
+                                  if not key.endswith('_movies')])
+                LOG.info('trakt response (filtered): %s' % pformat(filtered_data))
+
             return True
 
         else:
