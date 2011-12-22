@@ -13,12 +13,12 @@ Features
 Install
 =======
 
-Either download the script from https://github.com/jone/plone-trakt-syncer/downloads or
+Either download the script from https://github.com/jone/plex-trakt-syncer/downloads or
 clone the repository with git:
 
 ::
 
-    $ git clone https://github.com/jone/plone-trakt-syncer.git
+    $ git clone https://github.com/jone/plex-trakt-syncer.git
     $ cd plex-trakt-syncer
     $ plex-trakt-sync.py --help
 
@@ -75,7 +75,7 @@ this stuff is worth it, you can buy me a beer in return.
 Source
 ======
 
-The source is located at https://github.com/jone/plone-trakt-syncer
+The source is located at https://github.com/jone/plex-trakt-syncer
 
 
 .. _Trakt: http://trakt.tv/
