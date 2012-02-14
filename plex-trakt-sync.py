@@ -199,7 +199,7 @@ class Syncer(object):
     def _plex_request(self, path):
         """Makes a request to plex and parses the XML with minidom.
         """
-        url = 'http://%s:%i/%s' % (
+        url = 'http://%s:%s/%s' % (
             self.options.plex_host,
             self.options.plex_port,
             path)
