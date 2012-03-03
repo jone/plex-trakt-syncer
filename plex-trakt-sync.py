@@ -53,10 +53,14 @@ class Syncer(object):
         self.parse_arguments(args)
 
         movie_nodes = tuple(self.plex_get_watched_movies())
-        self.trakt_report_movies(movie_nodes)
 
-        if self.options.rate:
-            self.trakt_rate_movies(movie_nodes)
+        if movie_nodes:
+            self.trakt_report_movies(movie_nodes)
+            if self.options.rate:
+                self.trakt_rate_movies(movie_nodes)
+
+        else:
+            LOG.warning('No movies could be found in your plex server.')
 
     def quit_with_error(self, message):
         LOG.error(message)
@@ -245,7 +249,7 @@ class Syncer(object):
 
             else:
                 filtered_data = dict([(key, value) for (key, value) in resp_json.items()
-                                  if not key.endswith('_movies')])
+                                      if not key.endswith('_movies')])
                 LOG.info('Trakt request success: %s' % pformat(filtered_data))
 
             return True
