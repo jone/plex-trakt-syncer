@@ -52,15 +52,11 @@ class Syncer(object):
 
         self.parse_arguments(args)
 
-        movie_nodes = tuple(self.plex_get_watched_movies())
+        if self.options.sync_movies:
+            self.sync_movies()
 
-        if movie_nodes:
-            self.trakt_report_movies(movie_nodes)
-            if self.options.rate:
-                self.trakt_rate_movies(movie_nodes)
-
-        else:
-            LOG.warning('No movies could be found in your plex server.')
+        if self.options.sync_shows:
+            self.sync_shows()
 
     def quit_with_error(self, message):
         LOG.error(message)
@@ -92,6 +88,16 @@ class Syncer(object):
             '-p', '--password', dest='trakt_password',
             metavar='PASSWORD',
             help='trakt.tv password')
+
+        parser.add_option(
+            '--no-movies', dest='sync_movies', action='store_false',
+            default=True,
+            help='Do not sync watched movies.')
+
+        parser.add_option(
+            '--no-shows', dest='sync_shows', action='store_false',
+            default=True,
+            help='Do not sync watched shows.')
 
         parser.add_option(
             '-k', '--key', dest='trakt_key',
@@ -139,10 +145,64 @@ class Syncer(object):
         if self.options.min_love > 10 or self.options.min_love < 0:
             self.quit_with_error('--min-love should be between 1 and 10')
 
+    def sync_movies(self):
+        movie_nodes = tuple(self.plex_get_watched_movies())
+
+        if movie_nodes:
+            self.trakt_report_movies(movie_nodes)
+            if self.options.rate:
+                self.trakt_rate_movies(movie_nodes)
+
+        else:
+            LOG.warning('No watched movies could be found in your '
+                        'plex server.')
+
+    def sync_shows(self):
+        episode_data = self.plex_get_watched_episodes()
+
+        if episode_data:
+            self.trakt_report_episodes(episode_data)
+
+        else:
+            LOG.warning('No watched show episodes could be found on your '
+                        'plex server.')
+
     def plex_get_watched_movies(self):
-        for node in self._plex_request('library/sections/1/all'):
+        for node in self._plex_request('/library/sections/1/all'):
             if node.getAttribute('viewCount'):
                 yield node
+
+    def plex_get_shows(self):
+        return self._plex_request('/library/sections/2/all',
+                                  nodename='Directory')
+
+    def plex_get_seasons(self):
+        for show in self.plex_get_shows():
+            seasons = []
+            show_key = show.getAttribute('key')
+
+            for season in self._plex_request(show_key, nodename='Directory'):
+                seasons.append(season)
+
+            yield show, seasons
+
+    def plex_get_watched_episodes(self):
+        shows = []
+
+        for show, seasons in self.plex_get_seasons():
+            episodes = []
+
+            for season in seasons:
+                season_key = season.getAttribute('key')
+
+                for episode in self._plex_request(season_key):
+                    if episode.getAttribute('viewCount'):
+                       episodes.append((season, episode))
+
+            if len(episodes) > 0:
+                shows.append((show, episodes))
+
+        return shows
 
     def get_movie_data(self, node):
         """Returns movie data from a XML node, prepared to post to trakt.
@@ -151,6 +211,10 @@ class Syncer(object):
                 'year': node.getAttribute('year'),
                 'plays': node.getAttribute('viewCount'),
                 'last_played': node.getAttribute('updatedAt')}
+
+    def get_show_data(self, show):
+        return {'title': show.getAttribute('title'),
+                'year': show.getAttribute('year')}
 
     def get_movie_rating(self, node):
         rating = node.getAttribute('userRating')
@@ -178,6 +242,46 @@ class Syncer(object):
         LOG.info('Mark %s movies as seen in trakt.tv' % len(movies))
         self._trakt_post('movie/seen', {'movies': movies})
 
+    def trakt_report_episodes(self, episode_data):
+        for show, episodes in episode_data:
+            show_data = self.get_show_data(show)
+            data = show_data.copy()
+            data['episodes'] = []
+
+            for season, episode in episodes:
+                data['episodes'].append({
+                        'season': season.getAttribute('index'),
+                        'episode': episode.getAttribute('index')})
+                LOG.debug(('Mark episode "%s", season %s, episode'
+                           ' %s (%s) as seen') % (
+                        data['title'],
+                        season.getAttribute('index'),
+                        episode.getAttribute('index'),
+                        episode.getAttribute('title')))
+
+                if self.options.rate:
+                    rating = self.get_movie_rating(episode)
+                    if rating:
+                        episode_data = show_data.copy()
+                        episode_data.update({
+                                'season': season.getAttribute('index'),
+                                'episode': episode.getAttribute('index'),
+                                'rating': rating})
+
+                        LOG.info(('Rate episode "%s", season %s, episode'
+                                   ' %s (%s) with "%s"') % (
+                                data['title'],
+                                season.getAttribute('index'),
+                                episode.getAttribute('index'),
+                                episode.getAttribute('title'),
+                                rating))
+                        self._trakt_post('rate/episode', episode_data)
+
+            LOG.info(('Mark "%s" episodes of the show %s as '
+                      'seen in trakt.tv') % (
+                    len(data['episodes']), data['title']))
+            self._trakt_post('show/episode/seen', data)
+
     def trakt_rate_movies(self, nodes):
         rated = 0
         total = 0
@@ -200,10 +304,10 @@ class Syncer(object):
         LOG.info('Rated %s of %s movies in trakt.tv' % (
                 rated, total))
 
-    def _plex_request(self, path):
+    def _plex_request(self, path, nodename='Video'):
         """Makes a request to plex and parses the XML with minidom.
         """
-        url = 'http://%s:%s/%s' % (
+        url = 'http://%s:%s%s' % (
             self.options.plex_host,
             self.options.plex_port,
             path)
@@ -216,7 +320,7 @@ class Syncer(object):
 
         LOG.info('Plex request success')
 
-        return doc.getElementsByTagName('Video')
+        return doc.getElementsByTagName(nodename)
 
     def _trakt_post(self, path, data):
         """Posts informations to trakt. Data should be a dict which will
