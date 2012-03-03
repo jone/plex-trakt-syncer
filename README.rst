@@ -7,8 +7,16 @@ A simple console script for updating your Trakt_ profile with the infos from you
 Features
 ========
 
-- Marks movies watched in Plex_ when watched in your Trakt_ profile.
-- Optionally flages the movies in Trakt_ with "love" or "hate" according to the rating in Plex_.
+- Marks **movies** and **show episodes** watched in Plex_ when watched in your Trakt_ profile.
+- Optionally flages the movies and show episodes in Trakt_ with "love" or "hate" according to the rating in Plex_.
+
+
+Scrobbling
+==========
+
+At the current state this script does not scrobble. Feel free to modify the script and start a pull-request.
+
+
 
 Install
 =======
@@ -22,7 +30,7 @@ clone the repository with git:
     $ cd plex-trakt-syncer
     $ plex-trakt-sync.py --help
 
-You may also want to set up a cronjob for starting the script.
+You may also want to set up a cronjob_ for starting the script.
 
 
 Usage
@@ -33,11 +41,11 @@ Usage
 ::
 
     Usage: plex-trakt-sync.py [options]
-    
+
     This script connects to a Plex media center server and reports the watched
     movies to a trakt.tv user profile. Optionally it also flags the movies at the
     trakt profile with "love" or "hate" according to ratings in Plex.
-    
+
     Options:
       --version             show program's version number and exit
       -h, --help            show this help message and exit
@@ -57,7 +65,7 @@ Usage
       --min-love=1-10       Minimum plex rating for flagging a movie with "love"
                             (In combination with -r option, defaults to 8).
       -v, --verbose         Print more verbose debugging informations.
-    
+
      ** Rating **           The plex rating allows to give up to 5 stars for a
     movie, but you can also give half stars, so there are 10 steps for the rating.
     The configurable --min-hate and --max-love options take a value between 1 and
@@ -83,3 +91,4 @@ The source is located at https://github.com/jone/plex-trakt-syncer
 .. _Trakt: http://trakt.tv/
 .. _Plex: http://www.plexapp.com/
 .. _jone: http://github.com/jone
+.. _cronjob: http://de.wikipedia.org/wiki/Cron
