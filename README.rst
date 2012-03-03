@@ -47,6 +47,8 @@ Usage
                             trakt.tv username
       -p PASSWORD, --password=PASSWORD
                             trakt.tv password
+      --no-movies           Do not sync watched movies.
+      --no-shows            Do not sync watched shows.
       -k API-KEY, --key=API-KEY
                             trakt.tv API key
       -r, --rate            Submit plex movie ratings to trakt.
