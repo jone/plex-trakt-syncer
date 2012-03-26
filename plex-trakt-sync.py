@@ -168,23 +168,26 @@ class Syncer(object):
                         'plex server.')
 
     def plex_get_watched_movies(self):
-        for node in self._plex_request('/library/sections/1/all'):
-            if node.getAttribute('viewCount'):
-                yield node
+        for section_path in self._get_plex_section_paths('movie'):
+            for node in self._plex_request(section_path + 'all'):
+                if node.getAttribute('viewCount'):
+                    yield node
 
-    def plex_get_shows(self):
-        return self._plex_request('/library/sections/2/all',
+    def plex_get_shows(self, section_path):
+        return self._plex_request('%sall' % section_path,
                                   nodename='Directory')
 
     def plex_get_seasons(self):
-        for show in self.plex_get_shows():
-            seasons = []
-            show_key = show.getAttribute('key')
+        for section_path in self._get_plex_section_paths('show'):
+            for show in self.plex_get_shows(section_path):
+                seasons = []
+                show_key = show.getAttribute('key')
 
-            for season in self._plex_request(show_key, nodename='Directory'):
-                seasons.append(season)
+                for season in self._plex_request(show_key,
+                                                 nodename='Directory'):
+                    seasons.append(season)
 
-            yield show, seasons
+                yield show, seasons
 
     def plex_get_watched_episodes(self):
         shows = []
@@ -303,6 +306,23 @@ class Syncer(object):
 
         LOG.info('Rated %s of %s movies in trakt.tv' % (
                 rated, total))
+
+    def _get_plex_section_paths(self, type_):
+        """Returns all paths to sections of a particular type.
+        _get_plex_section_paths('movie') => ['/library/sections/1/']
+        """
+
+        sections_path = '/library/sections'
+        paths = []
+
+        for node in self._plex_request(sections_path,
+                                       nodename='Directory'):
+            if node.getAttribute('type') == type_:
+                paths.append('%s/%s/' % (
+                        sections_path,
+                        node.getAttribute('key')))
+
+        return paths
 
     def _plex_request(self, path, nodename='Video'):
         """Makes a request to plex and parses the XML with minidom.
